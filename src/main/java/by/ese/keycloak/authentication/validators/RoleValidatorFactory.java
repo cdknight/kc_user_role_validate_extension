@@ -17,17 +17,25 @@ import java.util.List;
 
 public class RoleValidatorFactory implements AuthenticatorFactory, DisplayTypeAuthenticatorFactory {
     public static final String PROVIDER_ID = "user-role-validator";
-    protected static final String USER_ROLE = "validatedUserRole";
+    protected static final String UNIVERSAL_ROLE = "validatedUniversalRole";
+    protected static final String RBAC_SETTINGS = "validatedRBAC";
 
     private static final List<ProviderConfigProperty> commonConfig;
 
     static {
         commonConfig = Collections.unmodifiableList(ProviderConfigurationBuilder.create()
-            .property().name(USER_ROLE).label("User role")
-            .helpText("Role the user must have to execute this flow. Click 'Select Role' button to browse roles, " +
-                    "or just type it in the textbox. To specify an application role the syntax is appname.approle, " +
-                    "i.e. myapp.myrole")
+            .property().name(UNIVERSAL_ROLE).label("Universal role")
+            .helpText("Role that if, is present, will allow universal access to all clients. Click 'Select Role' button to browse roles")
             .type(ProviderConfigProperty.ROLE_TYPE).add()
+
+            .property().name(RBAC_SETTINGS).label("RBAC settings")
+            .helpText("Configure RBAC mappings, allowing only certain clients to certain roles." + 
+		    "The keys are the names of client_ids that you want to filder and the values" + 
+		    " are a semicolon-separated list of roles that should be allowed for said client." + 
+		    "Example key: \"client\" and value: \"trusted-users;people;world\""
+		    )
+            .type(ProviderConfigProperty.MAP_TYPE).add()
+
             .build()
         );
     }
