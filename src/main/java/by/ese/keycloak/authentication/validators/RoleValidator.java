@@ -11,6 +11,13 @@ import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.jboss.logging.Logger;
 
+import java.text.SimpleDateFormat;
+import java.text.ParseException;
+import java.util.TimeZone;
+import java.util.Date;
+import java.util.Optional;
+import java.time.Instant;
+
 public class RoleValidator implements Authenticator {
     public static final RoleValidator SINGLETON = new RoleValidator();
     private static final Logger logger = Logger.getLogger(RoleValidator.class);
@@ -27,7 +34,42 @@ public class RoleValidator implements Authenticator {
                 logger.errorv("Invalid role name submitted: {0}", requiredRole);
                 return false;
             }
-            return user.hasRole(role);
+	    // Perform user password expiry validation
+	    Optional<String> pwExpirationS = user.getAttributeStream("passwordExpiration").findFirst();
+	    if (!pwExpirationS.isPresent()) {
+		// The user does not have a password expiry
+		logger.warn("User does not have a passwordExpiration attribute!!");
+		// Return false
+		return false;
+			
+	    }
+	    // Yes, I know I shouldn't use java.util.Date. But... this is simpler.
+	    SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss'Z'");
+	    formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+	    Date userPwExpirationTime = null;
+	    try {
+		    userPwExpirationTime = formatter.parse(pwExpirationS.get());
+	    }
+            catch (ParseException pExc) {
+		    logger.warn("Failed to parse use password expiration time!!");
+		    return false;
+	    }
+	    // Check if password is expired
+	    // TODO will userPwExpiriationTime ever be null?
+	    if (userPwExpirationTime != null) {
+		    if (Date.from(Instant.now()).after(userPwExpirationTime)) {
+			    logger.warn("User password has expired, refuse login.");
+			    return false;
+		    }
+	    }
+	    
+	    // NOW check if the user has the role.
+	    if (user.hasRole(role)) {
+		    logger.warn("NOTE: User has role. Granting access.");
+		    return true;
+	    }
+	    logger.warn("Deny access, user does not have valid roles.");
         }
         return false;
     }
@@ -37,7 +79,7 @@ public class RoleValidator implements Authenticator {
         if(matchCondition(authenticationFlowContext)) {
             authenticationFlowContext.success();
         } else {
-            authenticationFlowContext.failure(AuthenticationFlowError.INVALID_CREDENTIALS);
+            authenticationFlowContext.failure(AuthenticationFlowError.ACCESS_DENIED);
         }
     }
 
